@@ -1,3 +1,3 @@
 ﻿  AvanceradCppUppg4.cpp
-C:\Users\an4211\source\repos\AvanceradCppUppg4\AvanceradCppUppg4\AvanceradCppUppg4.cpp(120,17): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-  AvanceradCppUppg4.vcxproj -> C:\Users\an4211\source\repos\AvanceradCppUppg4\x64\Debug\AvanceradCppUppg4.exe
+  LINK : C:\Users\an4211\Downloads\AvanceradCppUppg4-main\AvanceradCppUppg4-main\AvanceradCppUppg4\x64\Debug\AvanceradCppUppg4.exe not found or not built by the last incremental link; performing full link
+  AvanceradCppUppg4.vcxproj -> C:\Users\an4211\Downloads\AvanceradCppUppg4-main\AvanceradCppUppg4-main\AvanceradCppUppg4\x64\Debug\AvanceradCppUppg4.exe

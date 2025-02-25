@@ -1,11 +1,13 @@
 #include <iostream>
 #include <vector>
 #include <thread>
-#include <mutex>
 #include <fstream>
 #include <string>
 #include <chrono>
 #include <algorithm>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
 
 // Function declaration
 void ThreadMethod(std::vector<int>& myVector, int start, int end, int threadIndex);
@@ -16,6 +18,21 @@ std::mutex mtx;
 int totalMatchCount = 0;
 #define LEVEL 4  // Corrected macro definition
 #define N 10       // Number of threads
+
+struct Order
+{
+	int id;
+	int processingTime; // Time in milliseconds
+};
+
+void customerThread(int id);
+void baristaThread(int id);
+
+std::queue<Order> orderQueue;
+std::mutex queueMutex;
+std::condition_variable queueCV;
+std::mutex printMutex;
+const int MAX_QUEUE_SIZE = 5;
 
 
 int main()
@@ -150,17 +167,101 @@ int main()
 #endif
 #if LEVEL == 4
 
-	std::vector<std::thread> consumerThreads;
+	const int numCustomers = 5;
+	const int numBaristas = 2;
+
+	std::vector<std::thread> customerThreads;
 	std::vector<std::thread> baristaThreads;
 
-#endif
-#if LEVEL == 5
+	for (int i = 0; i < numCustomers; ++i) {
+		customerThreads.emplace_back(customerThread, i + 1);
+	}
+
+	for (int i = 0; i < numBaristas; ++i) {
+		baristaThreads.emplace_back(baristaThread, i + 1);
+	}
+
+	for (auto& t : customerThreads) {
+		t.join();
+	}
+
+	for (auto& t : baristaThreads) {
+		t.join();
+	}
 
 #endif
 
 	return 0;
 }
 
+
+void customerThread(int id) 
+{
+	while (true) 
+	{
+		Order order;
+		order.id = id;
+		order.processingTime = rand() % 5000 + 1000;
+
+
+		//Wait in queue until theres room for a new order
+		std::unique_lock<std::mutex> lock(queueMutex);
+		queueCV.wait(lock, [] { return orderQueue.size() < MAX_QUEUE_SIZE; });
+
+		//Push new order to orderqueue when room is there
+		orderQueue.push(order);
+		{
+			//Print info. Lock to ensure that only one thread writes at a time.
+			std::lock_guard<std::mutex> printLock(printMutex);
+			std::cout << "Customer " << id << " placed order: " << order.id << std::endl;
+			std::cout << "Number of placed orders: " << orderQueue.size() << std::endl;
+		}
+
+		//Notify barista threads that new order is placed
+		queueCV.notify_all();
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000)); 
+	}
+}
+
+void baristaThread(int id) 
+{
+	while (true)
+	{
+		//Wait until there is an order in the queue
+		std::unique_lock<std::mutex> lock(queueMutex);
+		queueCV.wait(lock, [] { return !orderQueue.empty(); });
+
+		//Take the first order and pop it from the queue
+		Order order = orderQueue.front();
+		orderQueue.pop();
+		{
+			//Print info. Lock to ensure that only one thread writes at a time.
+			std::lock_guard<std::mutex> printLock(printMutex);
+			std::cout << "Barista " << id << " started order: " << order.id << std::endl;
+		}
+
+		//Notify customers that there is new room in queue
+		queueCV.notify_all();
+		lock.unlock();
+
+		int progress = 0;
+		while (progress < 100) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(order.processingTime / 5));
+			progress += 20;
+			{
+				//Print info. Lock to ensure that only one thread writes at a time.
+				std::lock_guard<std::mutex> printLock(printMutex);
+				std::cout << "Barista " << id << " - Order " << order.id << " progress: " << progress << "%" << std::endl;
+			}
+		}
+
+		{			
+			//Print info. Lock to ensure that only one thread writes at a time.
+			std::lock_guard<std::mutex> printLock(printMutex);
+			std::cout << "Barista " << id << " completed order: " << order.id << std::endl;
+		}
+	}
+}
 // Function definition
 void ThreadMethod(std::vector<int>& myVector, int start, int end, int threadIndex)
 {
